@@ -1,0 +1,43 @@
+# Run all six Hello World containers with one command:
+#   docker compose up -d --build
+#   docker compose ps
+#   docker compose down
+#
+# Host ports match the table in README.md.
+
+services:
+  node:
+    build: ./nodejs-app
+    image: nodejs-app
+    container_name: hello-node
+    ports: ["3002:3000"]
+
+  python:
+    build: ./python-app
+    image: python-app
+    container_name: hello-python
+    ports: ["5001:5000"]
+
+  java:
+    build: ./java-app
+    image: java-app
+    container_name: hello-java
+    ports: ["8080:8080"]
+
+  apache:
+    build: ./Apache-app
+    image: apache-app
+    container_name: hello-apache
+    ports: ["8081:80"]
+
+  react:
+    build: ./React-app
+    image: react-app
+    container_name: hello-react
+    ports: ["8082:80"]
+
+  nginx:
+    build: ./nginx-app
+    image: nginx-app
+    container_name: hello-nginx
+    ports: ["8083:80"]

@@ -1,229 +1,293 @@
 # Linux Fundamentals
 
-Working notes for the Linux assignment. Every command below was run in an Ubuntu 24.04
-environment (hostname `ubuntu-lab`) and the output was captured as screenshots.
+## At a glance
 
-## Part 1 - Hard links vs symbolic links
+Four exercises that build the mental model most Linux work rests on: how file names relate to
+data on disk (links), how accounts are created (`useradd` vs `adduser`), how to read what the
+system has been doing (`journalctl`), and a cheat sheet of the commands you will type every day.
 
-A file name in Linux is just a directory entry that points at an inode. The inode holds the
-actual metadata and data blocks. Links are two different ways of giving that data another name.
-
-**Hard link** - a second directory entry pointing at the *same inode*. Both names are equal
-peers; there is no "original". The link count on the inode goes up by one, and the data is only
-freed when the count drops to zero.
-
-**Symbolic (soft) link** - a separate small file whose content is a *path* to another file.
-It has its own inode. If the target is removed the link stays behind but points at nothing.
-
-| | Hard link | Symbolic link |
-|---|---|---|
-| What it stores | Inode reference | A path string |
-| Own inode? | No, shares the target's | Yes |
-| Survives deleting the target | Yes, data stays reachable | No, becomes dangling |
-| Works across filesystems | No | Yes |
-| Can point to a directory | No (normal users) | Yes |
-| `ls -l` marker | Looks like a regular file | `l` type, shows `-> target` |
-
-### Commands used
+All commands were run in an `ubuntu:24.04` container named `ubuntu-lab`. Start one with:
 
 ```bash
-ln notes.txt notes-hard.txt        # hard link
-ln -s notes.txt notes-soft.txt     # symbolic link
-ls -li                             # -i shows inode numbers
-stat -c "%n inode=%i links=%h" notes.txt notes-hard.txt notes-soft.txt
-rm notes.txt                       # delete the original name
-unlink notes-soft.txt              # remove a link (same as rm)
+docker run -it --rm --hostname ubuntu-lab ubuntu:24.04 bash
 ```
 
-### What the run showed
+## Concepts
 
-- `notes.txt` and `notes-hard.txt` had the same inode (`2467326`) and a link count of 2.
-- `notes-soft.txt` had a different inode and a link count of 1.
-- Appending to the hard link changed `notes.txt` too, since they are the same data.
-- After `rm notes.txt`, the hard link still printed both lines. The symlink returned
-  `No such file or directory`.
+### Names, inodes, and data
+
+On a Linux filesystem a file has three separate parts:
+
+```
+directory entry  ──►  inode  ──►  data blocks
+   ("notes.txt")      (owner, mode,      (the bytes)
+                       size, link count,
+                       block pointers)
+```
+
+The **name** is only a directory entry pointing at an **inode**. The inode holds metadata and
+pointers to the data. This split is what makes links possible.
+
+- A **hard link** adds a second directory entry to the *same inode*. Neither name is the
+  original; both are equal. The inode's link count goes up, and the data is freed only when
+  the count reaches zero.
+- A **symbolic link** is a tiny file of its own whose content is a *path*. It has its own
+  inode. If the path stops resolving, the link is left dangling.
+
+| Question | Hard link | Symbolic link |
+|---|---|---|
+| Shares the target's inode? | Yes | No, has its own |
+| Still works after `rm target`? | Yes | No (dangling) |
+| Can cross filesystems? | No | Yes |
+| Can point at a directory? | No (as a normal user) | Yes |
+| How `ls -l` shows it | Indistinguishable from a regular file | `l` in the mode column and `-> target` |
+| Typical use | Deduplicating identical files on one disk | Shortcuts, versioned binaries (`python3 -> python3.12`) |
+
+### Two ways to create a user
+
+| | `useradd` | `adduser` |
+|---|---|---|
+| What it is | Low-level binary from shadow-utils | Debian/Ubuntu Perl wrapper around `useradd` |
+| Creates a home directory | Only with `-m` | Always |
+| Copies `/etc/skel` | Only with `-m` | Always |
+| Default shell | System default (`/bin/sh` on Debian) | `/bin/bash` |
+| Sets a password | No | Prompts (unless `--disabled-password`) |
+| Interactive | Never | By default |
+| Best for | Scripts, Dockerfiles, automation | Interactive admin work |
+
+Rule of thumb: **`adduser` when a human is typing, `useradd` when a script is running.**
+
+### The systemd journal
+
+`systemd-journald` collects logs from the kernel, from every service's stdout/stderr, and from
+syslog into one indexed binary store. `journalctl` is the query tool. Instead of guessing which
+file under `/var/log` holds the message, you filter by unit, priority, boot, or time.
+
+## Lab
+
+### 1. Hard link vs symbolic link
+
+```bash
+mkdir -p ~/linklab && cd ~/linklab
+echo "line one" > notes.txt
+
+ln    notes.txt notes-hard.txt      # hard link
+ln -s notes.txt notes-soft.txt      # symbolic link
+
+ls -li                              # -i prints the inode number
+stat -c "%n  inode=%i  links=%h" notes.txt notes-hard.txt notes-soft.txt
+
+echo "line two" >> notes-hard.txt   # write through the hard link
+cat notes.txt                       # both lines appear: same data
+
+rm notes.txt                        # remove the original name
+cat notes-hard.txt                  # still works
+cat notes-soft.txt                  # No such file or directory
+```
+
+**What you should see**
+
+- `notes.txt` and `notes-hard.txt` report the *same* inode number and a link count of `2`.
+- `notes-soft.txt` has a *different* inode and a link count of `1`.
+- After deleting `notes.txt`, the hard link still prints both lines while the symlink fails.
 
 ![hard link vs soft link](screenshots/hard-vs-soft-link.png)
 
-## Part 2 - useradd vs adduser
+### 2. `useradd` vs `adduser`
 
-Both create users, but they sit at different levels.
-
-- `useradd` is the low-level binary from the shadow-utils package. It does exactly what the
-  flags say and nothing more. Without `-m` there is no home directory, without `-s` the shell is
-  the system default (`/bin/sh` on Debian-based systems), and no password is set.
-- `adduser` is a Perl front-end shipped by Debian and Ubuntu. It calls `useradd` internally,
-  but it also creates the home directory, copies `/etc/skel`, picks the next free UID, sets
-  `/bin/bash`, adds the user to the `users` group, and prompts for a password and full name.
-
-**Which one on Ubuntu?** `adduser` for interactive admin work, because it leaves the account
-in a usable state in one step. `useradd` is the better choice inside scripts and Dockerfiles
-where you want every detail spelled out and no prompts.
-
-### Commands used
+The stock `ubuntu:24.04` image does not include `adduser`, so install it first.
 
 ```bash
+apt-get update -qq && apt-get install -y -qq adduser
+
+# low level: spell out everything you want
 useradd -m -s /bin/bash devuser1
 id devuser1
 grep devuser1 /etc/passwd
+ls -la /home/devuser1
 
+# high level: sensible defaults, non-interactive flags added for the lab
 adduser --disabled-password --gecos "Dev User Two" devuser2
 id devuser2
 grep devuser2 /etc/passwd
 ls -la /home/devuser2
 ```
 
-`--disabled-password` and `--gecos` were passed so the run is non-interactive; without them
-`adduser` prompts for a password and the name fields.
+**What you should see**
 
-### What the run showed
-
-- `useradd` created `devuser1` with only the basics: uid 1001, one group, an empty home.
-- `adduser` printed each step it took: choosing uid 1002, creating the group, creating the home,
-  copying skeleton files, and adding the user to the extra `users` group. The GECOS field
-  (`Dev User Two,,,`) and `/bin/bash` shell show up in `/etc/passwd`, and the home directory
-  already contains `.bashrc`, `.profile` and `.bash_logout`.
-- Note: the stock `ubuntu:24.04` container image does not ship `adduser`, so it was installed
-  first with `apt-get install adduser`.
+- `useradd` is silent. The account exists with the next free UID and the home directory you
+  asked for, and nothing more.
+- `adduser` narrates each step: picking the UID, creating the group, creating the home,
+  copying skeleton files, adding the user to `users`. The GECOS field
+  (`Dev User Two,,,`) and `/bin/bash` show up in `/etc/passwd`, and the home already holds
+  `.bashrc`, `.profile`, and `.bash_logout`.
 
 ![useradd vs adduser](screenshots/useradd-vs-adduser.png)
 
-## Part 3 - journalctl
+### 3. Reading logs with `journalctl`
 
-`journalctl` queries the binary log kept by `systemd-journald`. Instead of grepping through
-`/var/log/*.log`, you filter the journal by unit, priority, boot, or time range.
-
-Frequently used forms:
+A plain container has no init system, so there is no journal to read. To practise properly,
+run a container with systemd as PID 1:
 
 ```bash
-journalctl                      # everything, oldest first (paged)
-journalctl -b                   # only the current boot
-journalctl -n 20                # last 20 lines
-journalctl -f                   # follow, like tail -f
-journalctl -u cron              # a single unit's log
-journalctl -p err               # priority err and worse
-journalctl --since "2 minutes ago"
-journalctl --since today --until "1 hour ago"
-journalctl --no-pager           # plain output, useful in scripts
+docker run -d --name systemd-lab --privileged --cgroupns=host \
+  -v /sys/fs/cgroup:/sys/fs/cgroup:rw ubuntu:24.04 \
+  bash -c "apt-get update -qq && apt-get install -y -qq systemd cron && exec /usr/lib/systemd/systemd"
+
+docker exec -it systemd-lab bash
+systemctl is-system-running        # wait until this prints "running"
 ```
 
-### Practice: reading a service's log
-
-A container has no init system, so to test this properly I started `ubuntu:24.04` with
-`systemd` installed and `/usr/lib/systemd/systemd` as PID 1 (`--privileged` and the host's
-cgroup namespace are required). Once `systemctl is-system-running` reported `running`, I
-restarted `cron.service` and then pulled its log entries in several ways:
+Then generate some log lines and read them back several ways:
 
 ```bash
 systemctl restart cron
 systemctl --no-pager status cron
-journalctl --no-pager -b -n 12
-journalctl --no-pager -u cron
-journalctl --no-pager -p err -b -n 5
-journalctl --no-pager --since "2 minutes ago" -n 5
+
+journalctl --no-pager -b -n 12                  # last 12 lines of this boot
+journalctl --no-pager -u cron                   # everything from one unit
+journalctl --no-pager -p err -b -n 5            # only errors and worse
+journalctl --no-pager --since "2 minutes ago"   # time window
 ```
 
-The `-u cron` output shows the stop/start pair from the restart and cron's own startup lines,
-the `-p err` filter returned `-- No entries --` because nothing had failed, and the time filter
-returned only the recent lines.
+**What you should see**
+
+- The `-u cron` output contains the stop/start pair from the restart and cron's own startup
+  message.
+- `-p err` prints `-- No entries --` because nothing has failed.
+- The `--since` filter returns only the most recent lines.
 
 ![journalctl](screenshots/journalctl.png)
 
-## Part 4 - Command cheat sheet
+The flags you will use most:
 
-Grouped by what I reach for them.
+```bash
+journalctl -f                  # follow, like tail -f
+journalctl -u nginx -f         # follow one unit
+journalctl -b -1               # the previous boot
+journalctl -p warning          # warning, err, crit, alert, emerg
+journalctl --since today --until "1 hour ago"
+journalctl -o json-pretty -n 1 # see every field journald stores
+journalctl --disk-usage        # how big the journal has grown
+```
 
-**Where am I, what is here**
+### 4. Everyday command drill
 
-| Command | Notes |
+A short session that touches files, permissions, and processes. Run it top to bottom.
+
+```bash
+mkdir -p drill/{src,build} && cd drill
+touch src/{a,b,c}.txt
+tree -L 2 2>/dev/null || find . -type f
+chmod 640 src/a.txt && ls -l src
+echo "hello" > src/a.txt && cat src/a.txt
+grep -rn hello .
+ps aux | head -5
+df -h / && free -h
+```
+
+![basic commands](screenshots/basic-commands.png)
+
+## Cheat sheet
+
+**Orientation**
+
+| Command | Use |
 |---|---|
-| `pwd` | print working directory |
-| `ls -la` | long listing including dotfiles |
-| `cd -` | jump back to the previous directory |
-| `tree -L 2` | directory tree, two levels (needs the `tree` package) |
-| `find . -name "*.txt"` | search by name; `-type f`, `-mtime -1` for filters |
-| `du -sh *` | size of each item in the current directory |
+| `pwd` | where am I |
+| `ls -la` | everything here, including dotfiles |
+| `cd -` | back to the previous directory |
+| `find . -name "*.log" -mtime -1` | files matching a name changed in the last day |
+| `du -sh *` | size of each item here |
 
-**Creating, moving, removing**
+**Files and directories**
 
-| Command | Notes |
+| Command | Use |
 |---|---|
-| `mkdir -p a/b/c` | create nested directories in one go |
-| `touch file` | create an empty file or bump its timestamp |
-| `cp -r src dst` | copy; `-r` for directories |
+| `mkdir -p a/b/c` | nested directories in one go |
+| `touch f` | create empty file or update its timestamp |
+| `cp -r src dst` | copy recursively |
 | `mv old new` | move or rename |
-| `rm -rf dir` | remove recursively without prompting; be careful |
+| `rm -rf dir` | delete recursively with no prompt. Double-check the path first |
+| `ln -s target name` | symbolic link |
 
-**Reading files**
+**Reading text**
 
-| Command | Notes |
+| Command | Use |
 |---|---|
-| `cat file` | dump the whole file |
-| `less file` | page through it; `/` to search, `q` to quit |
-| `head -n 5` / `tail -n 5` | first or last lines |
-| `tail -f log` | follow a growing file |
+| `cat f` | print whole file |
+| `less f` | page through, `/` to search, `q` to quit |
+| `head -n 20 f` / `tail -n 20 f` | first or last lines |
+| `tail -f f` | follow as it grows |
 | `grep -rn "text" .` | recursive search with line numbers |
-| `wc -l file` | count lines |
+| `wc -l f` | count lines |
 
 **Permissions and ownership**
 
-| Command | Notes |
+| Command | Use |
 |---|---|
-| `chmod 640 file` | owner rw, group r, others nothing |
-| `chmod +x script.sh` | make executable |
-| `chown user:group file` | change owner and group |
-| `umask` | default permission mask for new files |
+| `chmod 640 f` | owner rw, group r, others nothing |
+| `chmod +x s.sh` | make executable |
+| `chown user:group f` | change owner and group |
+| `umask` | mask applied to new files |
 
-**Users and identity**
+**Users**
 
-| Command | Notes |
+| Command | Use |
 |---|---|
-| `whoami` / `id` | current user, uid and groups |
-| `sudo adduser name` | create a user interactively |
-| `passwd name` | set or change a password |
+| `whoami` / `id` | who am I, with uid and groups |
+| `adduser name` | create a user interactively |
+| `passwd name` | set a password |
 | `su - name` | switch user with a login shell |
-| `groups name` | list group membership |
+| `groups name` | group membership |
 
 **Processes and resources**
 
-| Command | Notes |
+| Command | Use |
 |---|---|
-| `ps aux` | all processes; pipe into `grep` |
+| `ps aux` | all processes |
 | `top` / `htop` | live view |
-| `kill -15 PID` | ask a process to exit; `-9` to force |
-| `df -h` | disk usage per filesystem |
+| `kill -15 PID` | polite stop; `-9` forces |
+| `df -h` | disk per filesystem |
 | `free -h` | memory |
-| `uname -a` | kernel and architecture |
 | `uptime` | load averages |
-
-**Networking**
-
-| Command | Notes |
-|---|---|
-| `ip a` / `ip route` | interfaces and routing table |
-| `ss -tulpn` | listening sockets and owning processes |
-| `ping -c 4 host` | reachability |
-| `curl -I url` | HTTP headers only |
+| `uname -a` | kernel and architecture |
 
 **Services and logs**
 
-| Command | Notes |
+| Command | Use |
 |---|---|
 | `systemctl status unit` | is it running |
-| `systemctl restart unit` | restart |
-| `systemctl enable --now unit` | start now and on boot |
+| `systemctl enable --now unit` | start now and at boot |
 | `journalctl -u unit -f` | follow a unit's log |
 
 **Packages and archives**
 
-| Command | Notes |
+| Command | Use |
 |---|---|
 | `apt update && apt install pkg` | Debian/Ubuntu packages |
-| `tar -czf out.tgz dir` | create a gzip tarball |
-| `tar -xzf out.tgz` | extract it |
-| `man cmd` / `cmd --help` | built-in documentation |
+| `tar -czf out.tgz dir` | make a gzip tarball |
+| `tar -xzf out.tgz` | unpack it |
+| `man cmd` | the manual |
 | `history \| grep ssh` | find a command you ran before |
 
-A short session exercising the file, permission and process commands:
+## Pitfalls
 
-![basic commands](screenshots/basic-commands.png)
+- `rm` removes a *name*, not data. Data goes when the last hard link is gone and no process
+  holds the file open. This is why a deleted log file can still fill the disk.
+- `ln -s` stores the path you typed. A relative target is resolved relative to the *link's*
+  directory, not your current one. Moving the link can break it.
+- `useradd` without `-m` gives you a user with no home directory, and without `-s` on Debian
+  you get `/bin/sh`. Both surprise people the first time they log in.
+- `journalctl` pages by default. In scripts, or when piping to `grep`, add `--no-pager`.
+- `chmod -R 777` "fixes" a permission error and creates a security problem. Find the right
+  owner or group instead.
+
+## Check yourself
+
+1. Two files show the same size and content. How do you tell whether they are hard links to
+   the same inode or two separate copies?
+2. Why can a hard link not cross filesystems while a symbolic link can?
+3. You are writing a Dockerfile that needs a non-root user. Which command do you use and why?
+4. How would you show only the log lines a service produced during its last restart?
+5. What does the link count in `ls -l` mean for a directory?

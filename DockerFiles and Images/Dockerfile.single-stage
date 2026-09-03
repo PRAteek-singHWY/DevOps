@@ -1,0 +1,13 @@
+# The naive version, kept for comparison. Everything happens in one stage, so the
+# final image carries the Go toolchain, the source, and the build cache alongside
+# the 7 MB binary.
+#
+#   docker build -f Dockerfile.single-stage -t hello-singlestage .
+#   docker images hello-singlestage
+FROM golang:1.23-alpine
+WORKDIR /src
+COPY main.go .
+RUN go mod init hello-singlestage >/dev/null 2>&1 \
+ && go build -o /hello .
+EXPOSE 8080
+ENTRYPOINT ["/hello"]
