@@ -1,0 +1,7 @@
+# run-time output from Shell Scripting/sysinfo.sh
+reports/
+
+# local build output
+node_modules/
+dist/
+.DS_Store
