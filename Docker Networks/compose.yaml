@@ -1,0 +1,34 @@
+# The three-tier network layout from README.md, section 1, as a Compose file.
+#
+#   docker compose up -d
+#   docker compose exec api wget -qO- http://web | grep -o "<title>.*</title>"   # works
+#   docker compose exec api nc -z -w 3 db 5432 && echo "api -> db ok"           # works
+#   docker compose exec web nc -z -w 3 db 5432                                   # fails: web cannot see db
+#   docker compose down
+#
+# web  sits on public-net only
+# api  sits on all three networks and is the only thing that can reach db
+# db   sits on data-net only
+
+services:
+  web:
+    image: nginx:alpine
+    container_name: web
+    networks: [public-net]
+
+  api:
+    image: nginx:alpine
+    container_name: api
+    networks: [app-net, public-net, data-net]
+
+  db:
+    image: postgres:16-alpine
+    container_name: db
+    environment:
+      POSTGRES_PASSWORD: secret
+    networks: [data-net]
+
+networks:
+  public-net:
+  app-net:
+  data-net:
