@@ -1,0 +1,35 @@
+# One entry point, two Services: / goes to the frontend, /api/... to the backend.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: campus-ingress
+  namespace: default
+  labels:
+    app: campus-app
+  annotations:
+    # no TLS certificate in this exercise, so do not redirect to HTTPS
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    # needed for the regex capture groups in the /api path below
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    # strip the /api prefix before the request reaches the backend Pods
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: campus.local
+      http:
+        paths:
+          - path: /api(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: campus-backend-service
+                port:
+                  number: 80
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: campus-frontend-service
+                port:
+                  number: 80

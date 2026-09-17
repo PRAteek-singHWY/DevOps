@@ -1,0 +1,8 @@
+# An in-cluster CNAME that points at a host outside the cluster. No selector, no endpoints.
+apiVersion: v1
+kind: Service
+metadata:
+  name: webapp-externalname
+spec:
+  type: ExternalName
+  externalName: example.org

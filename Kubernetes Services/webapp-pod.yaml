@@ -1,0 +1,38 @@
+# One Nginx Pod serving a small custom page. Every Service here except ExternalName
+# reaches it through the label app=webapp.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: webapp-page
+data:
+  index.html: |
+    <!doctype html>
+    <html>
+      <head><title>DevOps Lab - Kubernetes Services</title></head>
+      <body style="font-family: system-ui; margin: 3rem">
+        <h1>Kubernetes Services Lab</h1>
+        <p>Served by the <code>webapp</code> Pod on Minikube.</p>
+        <p>DevOps Practice Labs</p>
+      </body>
+    </html>
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: webapp
+  labels:
+    app: webapp
+spec:
+  containers:
+    - name: nginx
+      image: nginx:1.29-alpine
+      ports:
+        - containerPort: 80
+          name: http
+      volumeMounts:
+        - name: page
+          mountPath: /usr/share/nginx/html
+  volumes:
+    - name: page
+      configMap:
+        name: webapp-page

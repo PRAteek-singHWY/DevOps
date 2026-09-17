@@ -1,0 +1,76 @@
+---
+# Frontend: plain Nginx serving a page from a ConfigMap, sitting behind path / of the Ingress.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: campus-frontend-page
+  namespace: default
+data:
+  index.html: |
+    <!doctype html>
+    <html>
+      <head><title>Campus Portal</title></head>
+      <body style="font-family: system-ui; margin: 3rem">
+        <h1>Campus Portal - Frontend</h1>
+        <p>Served by the <code>campus-frontend</code> Deployment through the NGINX Ingress.</p>
+        <p>Try <a href="/api/">/api/</a> for the backend.</p>
+        <p>DevOps Practice Labs</p>
+      </body>
+    </html>
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: campus-frontend
+  namespace: default
+  labels:
+    app: campus-frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: campus-frontend
+  template:
+    metadata:
+      labels:
+        app: campus-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: nginx:1.27-alpine
+          ports:
+            - containerPort: 80
+          envFrom:
+            - configMapRef:
+                name: campus-app-config
+          volumeMounts:
+            - name: page
+              mountPath: /usr/share/nginx/html
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "100m"
+              memory: "128Mi"
+      volumes:
+        - name: page
+          configMap:
+            name: campus-frontend-page
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: campus-frontend-service
+  namespace: default
+  labels:
+    app: campus-frontend
+spec:
+  type: ClusterIP
+  selector:
+    app: campus-frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+      protocol: TCP

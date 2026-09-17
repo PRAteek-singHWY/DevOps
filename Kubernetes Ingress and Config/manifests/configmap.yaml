@@ -1,0 +1,14 @@
+# Non-sensitive settings, kept out of the image so one image runs in every environment.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: campus-app-config
+  namespace: default
+  labels:
+    app: campus-app
+data:
+  ENVIRONMENT: "production"
+  LOG_LEVEL: "INFO"
+  APP_PORT: "5000"
+  DEFAULT_CAMPUS: "Bhopal"
+  SESSION_TIMEOUT_MIN: "45"

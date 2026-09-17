@@ -1,8 +1,8 @@
 # DevOps Practice Labs
 
-A hands-on path through the DevOps basics: Linux, shell scripting, networking, Git, and
-Docker. Every topic lives in its own folder with a README that explains the idea, walks
-through a lab you can reproduce, shows the evidence from a real run, and ends with a few
+A hands-on path through the DevOps basics: Linux, shell scripting, networking, Git, Docker
+and Kubernetes. Every topic lives in its own folder with a README that explains the idea,
+walks through a lab you can reproduce, shows the evidence from a real run, and ends with a few
 questions to check your understanding.
 
 ## Learning path
@@ -18,6 +18,10 @@ Work through the folders in this order. Each one leans on the previous.
 | 5 | [`Docker Fundamentals/`](Docker%20Fundamentals/README.md) | Six Hello World services in six runtimes, plus a Compose file to run them all | 60 min |
 | 6 | [`DockerFiles and Images/`](DockerFiles%20and%20Images/README.md) | Multi-stage builds: from a 365 MB toolchain to a 7 MB image | 30 min |
 | 7 | [`Docker Networks/`](Docker%20Networks/README.md) | Bridge, host, and overlay networks, plus bind mounts | 60 min |
+| 8 | [`Kubernetes Fundamentals/`](Kubernetes%20Fundamentals/README.md) | The control plane as Pods, a first Pod read through its Events, namespaces | 45 min |
+| 9 | [`Kubernetes Workloads/`](Kubernetes%20Workloads/README.md) | Pod → ReplicaSet → Deployment → DaemonSet, a rolling update and a rollback | 60 min |
+| 10 | [`Kubernetes Services/`](Kubernetes%20Services/README.md) | All five Service types against one Pod, each tested from where it should work | 60 min |
+| 11 | [`Kubernetes Ingress and Config/`](Kubernetes%20Ingress%20and%20Config/README.md) | ConfigMaps, Secrets, and one Ingress routing to two Services by path | 45 min |
 
 ## How each lab is laid out
 
@@ -50,6 +54,14 @@ Every README follows the same shape:
 - Docker labs need nothing beyond Docker itself. No language toolchains are installed on the
   host; every build happens inside a container.
 
+- Kubernetes labs run on a local single-node Minikube cluster (Docker driver, Kubernetes
+  v1.37.0, containerd). The ingress addon is needed for lab 11:
+
+  ```bash
+  minikube start --driver=docker
+  minikube addons enable ingress
+  ```
+
 ## Conventions
 
 - Commands are shown without a `$` prompt so they can be copied as-is. Output that is worth
@@ -68,4 +80,10 @@ docker compose -f "Docker Fundamentals/compose.yaml" up -d --build
 
 # stop them again
 docker compose -f "Docker Fundamentals/compose.yaml" down
+```
+
+```bash
+# bring up the Kubernetes cluster the last four labs use
+minikube start --driver=docker
+kubectl get nodes
 ```

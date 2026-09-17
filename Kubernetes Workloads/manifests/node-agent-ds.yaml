@@ -1,0 +1,27 @@
+# A DaemonSet has no replicas field: one Pod per eligible node, however many that is.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: node-metrics-agent
+  labels:
+    app: node-metrics-agent
+spec:
+  selector:
+    matchLabels:
+      app: node-metrics-agent
+  template:
+    metadata:
+      labels:
+        app: node-metrics-agent
+    spec:
+      containers:
+        - name: metrics-agent
+          image: busybox:1.37
+          command: ["sh", "-c", "while true; do echo \"[$(date)] collecting node metrics on $(hostname)\"; sleep 15; done"]
+          resources:
+            requests:
+              cpu: "10m"
+              memory: "16Mi"
+            limits:
+              cpu: "50m"
+              memory: "32Mi"

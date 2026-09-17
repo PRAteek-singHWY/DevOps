@@ -1,0 +1,14 @@
+# Reserves the same port on every node, so traffic from outside the cluster can get in.
+apiVersion: v1
+kind: Service
+metadata:
+  name: webapp-nodeport
+spec:
+  type: NodePort
+  selector:
+    app: webapp
+  ports:
+    - name: http
+      port: 9090
+      targetPort: http
+      nodePort: 30090   # allowed range is 30000-32767; drop this line to be assigned one

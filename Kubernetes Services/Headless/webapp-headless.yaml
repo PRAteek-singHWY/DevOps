@@ -1,0 +1,13 @@
+# clusterIP: None -> no virtual IP and no proxying; DNS hands back the Pod IPs directly.
+apiVersion: v1
+kind: Service
+metadata:
+  name: webapp-headless
+spec:
+  clusterIP: None
+  selector:
+    app: webapp
+  ports:
+    - name: http
+      port: 9090
+      targetPort: http

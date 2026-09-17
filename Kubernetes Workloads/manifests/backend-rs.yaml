@@ -1,0 +1,30 @@
+# A ReplicaSet keeps exactly `replicas` Pods matching the selector alive at all times.
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: campus-backend-rs
+  labels:
+    app: campus-backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: campus-backend
+  template:
+    metadata:
+      labels:
+        app: campus-backend
+    spec:
+      containers:
+        - name: backend
+          image: python:3.12-alpine
+          command: ["python3", "-m", "http.server", "5000"]
+          ports:
+            - containerPort: 5000
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"

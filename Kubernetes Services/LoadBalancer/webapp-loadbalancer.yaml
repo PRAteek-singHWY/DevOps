@@ -1,0 +1,13 @@
+# Requests an external load balancer from the cloud provider. Layers on top of NodePort.
+apiVersion: v1
+kind: Service
+metadata:
+  name: webapp-loadbalancer
+spec:
+  type: LoadBalancer
+  selector:
+    app: webapp
+  ports:
+    - name: http
+      port: 9090
+      targetPort: http

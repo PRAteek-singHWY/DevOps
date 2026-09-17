@@ -1,0 +1,13 @@
+# The default Service type: a stable virtual IP that only exists inside the cluster.
+apiVersion: v1
+kind: Service
+metadata:
+  name: webapp-clusterip
+spec:
+  type: ClusterIP
+  selector:
+    app: webapp
+  ports:
+    - name: http
+      port: 9090        # the port in-cluster clients dial
+      targetPort: http  # the Pod's named containerPort (80)
